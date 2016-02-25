@@ -7,21 +7,59 @@ nngraph.setDebug(false)
 require 'load'
 require 'KLDCriterion'
 require 'Sampler'
+-- cmdoptions
+local cmd = torch.CmdLine()
+cmd = torch.CmdLine()
+cmd:option('-dataset', 'mnist', 'which dataset to use')
+cmd:option('-gpu', 1, 'gpu indicator')
+cmd:option('-log', 1, 'log indicator')
+cmdopt = cmd:parse(arg)
+cmdopt_string = cmd:string('experiment', cmdopt, {log=true, gpu=true})
+if cmdopt.log > 0 then
+   paths.mkdir('save')
+   cmd:log('save/' .. cmdopt_string .. '.log', cmdopt)
+end
+-- 
 local MLP = require 'MLP'
 local bce = nn.BCECriterion()
 bce.sizeAverage = false
--- get data
-local data = loadmnist()
-local train = data.train
-local masked_train = train:clone()
-masked_train[{{},{1,392}}] = 0
--- settings
-local batch_size = 200
-local x_size = 784
-local y_size = 784
-local hidden_size = 400
+local data, train, masked_train, batch_size, x_size, y_size, z_size, hidden_size
+if cmdopt.dataset == "mnist" then
+   -- get data
+   data = loadmnist()
+   train = data.train
+   masked_train = train:clone()
+   masked_train[{{},{1,392}}] = 0
+   -- settings
+   batch_size = 200
+   x_size = 784
+   y_size = 784
+   hidden_size = 400
+else
+   -- get data
+   data = loadflipshift()
+   -- modify data
+   data.train = -data.train + 1
+   train = data.train
+   masked_train = train:clone()
+   masked_train[{{},{1,2048}}] = 0
+   -- settings
+   batch_size = 200
+   x_size = 4096
+   y_size = 4096
+   hidden_size = 400
+end
 -- create network
 local model = MLP.create_network(x_size, y_size, hidden_size)
+if cmdopt.gpu > 0 then
+   require 'cunn'
+   require 'cutorch'
+   -- convert to cuda
+   bce:cuda()
+   masked_train = masked_train:cuda()
+   train = train:cuda()
+   model:cuda()
+end
 -- retain parameters and gradients
 local parameters, gradients = model:getParameters()
 -- optimization function
@@ -45,16 +83,15 @@ end
 -- training
 local epoch = 0
 local bce_status = 0
-while epoch < 10 do
+while epoch < 100 do
    -- set up status
-   local tic = torch.tic()
    epoch = epoch + 1
    -- create batches
    local indices = torch.randperm(train:size(1)):long():split(batch_size)
    indices[#indices] = nil
    local N = #indices * batch_size
    -- update learning rate
-   if epoch % 5 == 0 then
+   if epoch % 30 == 0 then
       config.learningRate = config.learningRate/10
       print("New learning rate: " .. config.learningRate)
    end
@@ -78,9 +115,10 @@ while epoch < 10 do
    print("Epoch: " .. epoch)
    print("Running Average:")
    print(".. Bernoulli cross entropy: " .. bce_status/batch_size)
-   -- save
-   torch.save('save/MLP.t7',
-              {state=state,
-               config=config,
-               model=model})
+   if epoch % 10 == 0 then
+      torch.save('save/' .. cmdopt.dataset .. '_MLP.t7',
+		 {state=state,
+		  config=config,
+		  model=model})
+   end
 end
