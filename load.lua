@@ -16,3 +16,12 @@ function loadmnist()
    return data
 end
 
+function loadflipshift()
+   -- This loads a data of a picture of an object in various positions
+   local f = hdf5.open('datasets/flipshift.hdf5', 'r')
+   data = {}
+   data.train = f:read('dataset'):all():double()
+   f:close()
+   return data
+end
+

@@ -11,18 +11,33 @@ local CVAE = require 'CVAE'
 local kld = nn.KLDCriterion()
 local bce = nn.BCECriterion()
 bce.sizeAverage = false
--- get data
-local data = loadmnist()
-local train = data.train
-local masked_train = train:clone()
-masked_train[{{},{1,392}}] = 0
--- settings
-local batch_size = 200
-local x_size = 784
-local y_size = 784
-local z_size = 2
-local hidden_size = 400
--- create networks
+local use_dataset = "flipshift"
+local data, train, masked_train, batch_size, x_size, y_size, z_size, hidden_size
+if use_dataset == "mnist" then
+   -- get data
+   data = loadmnist()
+   train = data.train
+   masked_train = train:clone()
+   masked_train[{{},{1,392}}] = 0
+   -- settings
+   batch_size = 200
+   x_size = 784
+   y_size = 784
+   z_size = 2
+   hidden_size = 400
+else
+   -- get data
+   data = loadflipshift()
+   train = data.train
+   masked_train = train:clone()
+   masked_train[{{},{1,2048}}] = 0
+   -- settings
+   batch_size = 200
+   x_size = 4096
+   y_size = 4096
+   z_size = 2
+   hidden_size = 400
+end
 local prior = CVAE.create_prior_network(x_size, z_size, hidden_size)
 local encoder = CVAE.create_encoder_network(x_size, y_size, z_size, hidden_size)
 local decoder = CVAE.create_decoder_network(x_size, y_size, z_size, hidden_size)
@@ -38,7 +53,7 @@ local model = nn.gModule({x_input, y_input}, {pmu, plogv, mu, logv, recon})
 -- retain parameters and gradients
 local parameters, gradients = model:getParameters()
 -- optimization function
-local config = {learningRate = 0.01}
+local config = {learningRate = 0.001}
 local state = {}
 local opfunc = function(parameters_input, x_input, y_input)
    -- uses the following outside of encapsulation:
@@ -105,7 +120,7 @@ while epoch < 10 do
    print(".. Bernoulli cross entropy: " .. bce_status/batch_size)
    print(".. Gaussian KL divergence: " .. kld_status/batch_size)
    -- save
-   torch.save('save/CVAE_z' .. z_size .. '.t7',
+   torch.save('save/' .. use_dataset .. '_CVAE_z' .. z_size .. '.t7',
               {state=state,
                config=config,
                model=model,
