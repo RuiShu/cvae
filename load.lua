@@ -25,3 +25,10 @@ function loadflipshift()
    return data
 end
 
+function loadghost()
+   local f = hdf5.open('animate/ghost.h5', 'r')
+   data = {}
+   data.train = f:read('dataset'):all():double()
+   f:close()
+   return data
+end
