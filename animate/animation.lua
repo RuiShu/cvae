@@ -120,19 +120,19 @@ end
 loc = {32, 32}
 dir = 'u'
 win = nil
-N = 100000
+N = 1000
 buf = torch.Tensor(N, 4096)
 for i = 1,N do
    loc, dir = step(loc, dir)
    x = paint(loc)
    buf[i] = x:reshape(4096)
-   -- win = image.display({image=x, win=win, zoom=4})
+   win = image.display({image=x, win=win, zoom=4})
    -- sleep(.01)
 end
-print("Compressing file")
-local myFile = hdf5.open('ghost.h5', 'w')
-local options = hdf5.DataSetOptions()
-options:setChunked(512, 512)
-options:setDeflate()
-myFile:write('dataset', buf, options)
-myFile:close()
+-- print("Compressing file")
+-- local myFile = hdf5.open('ghost.h5', 'w')
+-- local options = hdf5.DataSetOptions()
+-- options:setChunked(512, 512)
+-- options:setDeflate()
+-- myFile:write('dataset', buf, options)
+-- myFile:close()
